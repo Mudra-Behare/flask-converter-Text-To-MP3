@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Text to Speech App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://unpkg.com/wavesurfer.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(to right, #f3f4f6, #e0e7ff);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      max-width: 800px;
+      width: 100%;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 28px;
+      color: #1f2937;
+      margin-bottom: 20px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 150px;
+      padding: 15px;
+      font-size: 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      resize: vertical;
+      margin-bottom: 20px;
+      outline: none;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    select, input[type="range"] {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      font-size: 16px;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      background-color: #6366f1;
+      color: white;
+      transition: background 0.3s;
+    }
+
+    .btn:hover {
+      background-color: #4f46e5;
+    }
+
+    .speed-label {
+      font-weight: 600;
+      color: #374151;
+    }
+
+    #waveform {
+      margin-top: 30px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .footer {
+      margin-top: 40px;
+      font-size: 14px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎤 Text to Speech Converter</h1>
+
+    <textarea id="text" placeholder="Type your text here..."></textarea>
+
+    <div class="controls">
+      <select id="voiceSelect"></select>
+
+      <button class="btn" onclick="playSpeech()">▶️ Play</button>
+      <button class="btn" onclick="pauseSpeech()">⏸️ Pause</button>
+      <button class="btn" onclick="stopSpeech()">⏹️ Stop</button>
+
+      <label class="speed-label">Speed:</label>
+      <input type="range" id="rateControl" min="0.5" max="2" step="0.1" value="1">
+      <span id="rateValue">1x</span>
+    </div>
+
+    <div id="waveform"></div>
+
+    <div class="footer">
+      Built with ❤️ using Web Speech API & WaveSurfer.js
+    </div>
+  </div>
+
+  <script>
+    const synth = window.speechSynthesis;
+    const voiceSelect = document.getElementById('voiceSelect');
+    const textArea = document.getElementById('text');
+    const rateControl = document.getElementById('rateControl');
+    const rateValue = document.getElementById('rateValue');
+    let voices = [];
+    let utterance;
+    let wave;
+    let isPaused = false;
+
+    function populateVoices() {
+      voices = synth.getVoices();
+      voiceSelect.innerHTML = '';
+      voices.forEach((voice, i) => {
+        const option = document.createElement('option');
+        option.textContent = `${voice.name} (${voice.lang})`;
+        option.value = i;
+        voiceSelect.appendChild(option);
+      });
+    }
+
+    populateVoices();
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = populateVoices;
+    }
+
+    rateControl.addEventListener('input', () => {
+      rateValue.textContent = `${rateControl.value}x`;
+    });
+
+    function playSpeech() {
+      const text = textArea.value.trim();
+      if (!text) return;
+
+      if (synth.speaking && isPaused) {
+        synth.resume();
+        isPaused = false;
+        return;
+      }
+
+      if (synth.speaking) synth.cancel();
+
+      utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = voices[voiceSelect.value];
+      utterance.rate = parseFloat(rateControl.value);
+      synth.speak(utterance);
+      startWave();
+    }
+
+    function pauseSpeech() {
+      if (synth.speaking) {
+        synth.pause();
+        isPaused = true;
+        if (wave) wave.pause();
+      }
+    }
+
+    function stopSpeech() {
+      synth.cancel();
+      isPaused = false;
+      if (wave) wave.destroy();
+    }
+
+    function startWave() {
+      if (wave) wave.destroy();
+
+      wave = WaveSurfer.create({
+        container: '#waveform',
+        waveColor: '#a5b4fc',
+        progressColor: '#6366f1',
+        height: 100,
+        barWidth: 2,
+        barGap: 2,
+        responsive: true,
+        interact: false
+      });
+
+      const duration = textArea.value.split(' ').length * 300;
+      const buffer = wave.backend.ac.createBuffer(1, wave.backend.ac.sampleRate * 2, wave.backend.ac.sampleRate);
+      wave.loadDecodedBuffer(buffer);
+
+      wave.on('ready', () => {
+        wave.play();
+        setTimeout(() => wave.stop(), duration);
+      });
+    }
+  </script>
+</body>
+</html>
